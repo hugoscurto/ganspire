@@ -15,23 +15,23 @@ import {
   dataset, 
   datasetBrowser } from '@marcellejs/core';
 
-const type_interface = 'multipage' // standard, sampling, multipage
+const type_interface = 'multipage'; // standard, sampling, multipage
 
-const t = text({ text: '' })
-t.title = 'Paramètres'
+const t = text({ text: '' });
+t.title = 'Paramètres';
 
-const s1 = slider({values: [0.], min: -1, max: 1, pips: true, pipstep: 50});
-const s2 = slider({values: [0.], min: -1, max: 1, pips: true, pipstep: 50});
-const s3 = slider({values: [0.], min: -1, max: 1, pips: true, pipstep: 50});
-s1.title = ''
-s2.title = ''
-s3.title = ''
+const s1 = slider({values: [0.0], min: -1, max: 1, pips: true, pipstep: 50});
+const s2 = slider({values: [0.0], min: -1, max: 1, pips: true, pipstep: 50});
+const s3 = slider({values: [0.0], min: -1, max: 1, pips: true, pipstep: 50});
+s1.title = '';
+s2.title = '';
+s3.title = '';
 
 const tog = toggle({ text: '' });
-tog.title = 'Filtre passe-bas'
+tog.title = 'Filtre passe-bas';
 
-const slid = slider({values: [120.], min: 5., max: 500., step: 1., pips: true, pipstep: 100});
-slid.title = 'Fréquence de coupure'
+const slid = slider({values: [120.0], min: 5.0, max: 500.0, step: 1.0, pips: true, pipstep: 100});
+slid.title = 'Fréquence de coupure';
 
 const sel_spa = select({ options: ['25.', '33.', '40.', '50.', '66.', '75.', '100.', '500.', '1000.', '10000.'], value: '50.' });
 sel_spa.title = 'Rayon';
@@ -52,7 +52,7 @@ const gc = genericChart({
     ylabel: 'y label',
   }
 });
-gc.title = ''
+gc.title = '';
 
 const testStream = createStream([], true);
 gc.addSeries(testStream, '');
@@ -94,13 +94,13 @@ ws.onopen = () => {
       ws.send(JSON.stringify({ action: 'data', slider1: s1.$values.value, slider2: s2.$values.value, slider3: s3.$values.value}));
     }, 200);
   });
-}
+};
 
 
 ws.onmessage = function(event) {
-  var msg = JSON.parse(event.data);
-  var time = new Date(msg.date);
-  var timeStr = time.toLocaleTimeString();
+  let msg = JSON.parse(event.data);
+  let time = new Date(msg.date);
+  let timeStr = time.toLocaleTimeString();
 
   testStream.set(msg.waveform);
   // console.log('testStream.value', testStream.value)
@@ -128,13 +128,13 @@ const dash = dashboard({
 });
 
 
-if (type_interface == 'standard') {
+if (type_interface === 'standard') {
   dash.page(' ').sidebar(t, s1, s2, s3).use(gc);
-} else if (type_interface == 'sampling') {
+} else if (type_interface === 'sampling') {
   dash.page(' ').sidebar(t, s1, s2, s3, sel_spa, sel_sam, b).use(gc);
-} else if (type_interface == 'multipage') {
+} else if (type_interface === 'multipage') {
   dash.page('Interface').sidebar(t, s1, s2, s3, tog, slid).use(gc);
-  dash.page('Échantillonnage').sidebar(sel_spa, sel_sam, sel_mod, b, imgUpload).use(instanceViewer);
+  // dash.page('Échantillonnage').sidebar(sel_spa, sel_sam, sel_mod, b, imgUpload).use(instanceViewer);
 }
 
 
