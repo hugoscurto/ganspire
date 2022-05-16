@@ -443,7 +443,7 @@ if __name__ == "__main__":
                         990, 2018, 44612, 266213, 1544, 6431, 39975, 33317, 8360]
     name_model = 'model.ckpt-' + str(list_model_ckpts[index_training - 1])
 
-    wavegan_path = '/Users/scurto/Documents/Eu/code/wavegan-master/train'
+    wavegan_path = './train'
 
     with open(wavegan_path + '/train_' + str(index_training) + '/args.txt', 'r') as read_obj:
         for line in read_obj:
