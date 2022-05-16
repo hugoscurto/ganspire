@@ -1,17 +1,40 @@
 # ganspire-interface
 
-> A [Marcelle](https://marcelle.netlify.app) Application
+This is an interface for GANspire, a generative model based on deep neural networks for human-like breathing signals. The interface is written using the [Marcelle](https://marcelle.dev) toolkit.
 
-## Available Scripts
 
-### npm run dev
+## Install
 
+After cloning the repo, make sure Marcelle is installed, otherwise install it locally:
+
+``` 
+npm install @marcellejs/core
+```
+
+### Launching the python server
+
+GANspire runs in python and communicates while the interface is a javasript app and runs in the browser. 
+
+In order to launch the python server, just type in the terminal: 
+```
+python server.py
+```
+
+The python server requires a pre-trained model that has to placed in `./train/train_7`. The pretrained model can be provided on demand. 
+
+### Launching the app
+
+Run the app in dev mode: 
+``` 
+npm run dev
+```
 Runs the app in the development mode.
 Open http://localhost:8080 to view it in the browser.
 
-The page will reload if you make edits.
-
-### npm run build
-
-Builds a static copy of your site to the `build/` folder.
+For deployment, use:
+``` 
+npm run build
+``` 
+The command builds a static copy of your site to the `build/` folder.
 Your app is ready to be deployed!
+
