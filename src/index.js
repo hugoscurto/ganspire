@@ -7,6 +7,7 @@ import {
   slider, 
   genericChart, 
   createStream, 
+  Stream,
   toggle, 
   imageUpload, 
   imageDisplay, 
@@ -15,6 +16,7 @@ import {
   dataset, 
   datasetBrowser } from '@marcellejs/core';
 
+let currentWaveform = [];
 const type_interface = 'multipage'; // standard, sampling, multipage
 
 const t = text({ text: '' });
@@ -29,6 +31,9 @@ s3.title = '';
 
 const tog = toggle({ text: '' });
 tog.title = 'Filtre passe-bas';
+
+const togStream = toggle({ text: '' });
+togStream.title = 'Stream';
 
 const slid = slider({values: [120.0], min: 5.0, max: 500.0, step: 1.0, pips: true, pipstep: 100});
 slid.title = 'Fréquence de coupure';
@@ -54,7 +59,7 @@ const gc = genericChart({
 });
 gc.title = '';
 
-const testStream = createStream([], true);
+const testStream = new Stream([], false);
 gc.addSeries(testStream, '');
 
 const ws = new WebSocket('ws://127.0.0.1:8766/');
@@ -88,6 +93,7 @@ ws.onopen = () => {
     ws.send(JSON.stringify({ action: 'filter_toggle', value: x}));
     ws.send(JSON.stringify({ action: 'data', slider1: s1.$values.value, slider2: s2.$values.value, slider3: s3.$values.value}));
   });
+
   slid.$values.subscribe(() => {
     ws.send(JSON.stringify({ action: 'filter_cutoff', value: slid.$values.value}));
     setTimeout(function () {
@@ -99,15 +105,12 @@ ws.onopen = () => {
 
 ws.onmessage = function(event) {
   let msg = JSON.parse(event.data);
-  let time = new Date(msg.date);
-  let timeStr = time.toLocaleTimeString();
-
   testStream.set(msg.waveform);
-  // console.log('testStream.value', testStream.value)
-
-  // ws2.send(JSON.stringify({waveform: msg.waveform}));
-  // console.log('ws2.readyState', ws2.readyState)
 };
+
+togStream.$checked.subscribe((x) => {
+  console.log(x, testStream);
+});
 
 
 b.$click.subscribe(() => {
@@ -133,7 +136,7 @@ if (type_interface === 'standard') {
 } else if (type_interface === 'sampling') {
   dash.page(' ').sidebar(t, s1, s2, s3, sel_spa, sel_sam, b).use(gc);
 } else if (type_interface === 'multipage') {
-  dash.page('Interface').sidebar(t, s1, s2, s3, tog, slid).use(gc);
+  dash.page('Interface').sidebar(t, s1, s2, s3, tog, slid, togStream).use(gc);
   // dash.page('Échantillonnage').sidebar(sel_spa, sel_sam, sel_mod, b, imgUpload).use(instanceViewer);
 }
 

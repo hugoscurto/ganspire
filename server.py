@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 from scipy.signal import butter, lfilter
-
+import time
 # from pythonosc import udp_client
 
 from ganspire import GANspire
@@ -105,10 +105,6 @@ async def main(websocket, path):
 
                 # Convert waveform into list and Scale for Marcelle
                 waveform = wav.tolist()
-                waveform.append(-1.)
-                waveform.append(1.)
-                waveform.insert(0, -1.)
-                waveform.insert(0, 1.)
 
                 # Send to Marcelle
                 await websocket.send(json.dumps(
@@ -121,10 +117,23 @@ async def main(websocket, path):
                 filter_cutoff = float(message["value"][0])
                 b, a = butter_lowpass(filter_cutoff, fs, order)
 
+            # if message["action"] == "stream":
+            #     # if message["status"][0]:
+            #     # Send to Marcelle
+            #     print(message)
+            #     time_now = 0
+            #     while message["status"]:
+            #         # if time.time()-time_now > 1.0:
+            #         await asyncio.sleep(0.1)
+            #         message_ = websocket.recv()
+            #         await websocket.send(json.dumps({'data': 1.0}))
+
+
             else:
+                
                 await websocket.send(json.dumps(
                     {'test': 'test'}))
-
+                        
             old_message = message
 
 

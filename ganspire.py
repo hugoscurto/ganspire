@@ -121,5 +121,9 @@ class GANspire:
         self.wav = _G_z[0, :, 0]
         return self.wav
 
+    def stream(self):
+        
+        return 0
+
     def get_U(self):
         return self.U
