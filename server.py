@@ -8,7 +8,7 @@ from scipy.signal import butter, lfilter
 import time
 # from pythonosc import udp_client
 
-from ganspire import GANspire
+from python.ganspire import GANspire
 
 
 # from IPython.display import display, Audio
