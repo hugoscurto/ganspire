@@ -4,11 +4,10 @@ import websockets
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
-from scipy.signal import butter, lfilter
 import time
 # from pythonosc import udp_client
 
-from python.ganspire import GANspire
+from python.ganspire import GANspire, OscPlayer
 
 
 # from IPython.display import display, Audio
@@ -58,19 +57,9 @@ def save_png(_G_z, coeff, sampling_factor, space_factor, index_sample, filter_to
     plt.savefig('./samplings/' + str(sampling_factor) +
                 '/r' + str(int(space_factor)) + str_filter + '.' + str(index_sample) + '.png')
 
-
-def butter_lowpass(cutoff, fs, order=5):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    return b, a
-
-
-def butter_lowpass_filter(data, cutoff, fs, order=5):
-    b, a = butter_lowpass(cutoff, fs, order=order)
-    y = lfilter(b, a, data)
-    return y
-
+slider1 = 0.
+slider2 = 0.
+slider3 = 0.
 
 async def main(websocket, path):
     # Initialise message
@@ -78,6 +67,8 @@ async def main(websocket, path):
 
     filter_toggle = False
     filter_cutoff = 120.
+
+    global slider1, slider2, slider3
 
     # Define sample rate (Hz) and order of filter
     order = 5
@@ -92,30 +83,64 @@ async def main(websocket, path):
 
             if message["action"] == "data":
 
-                # get latent coordinates from sliders on the interface
+                # Get latent coordinates from sliders on the interface
+                slider1 = float(message["slider1"][0])
+                slider2 = float(message["slider2"][0])
+                slider3 = float(message["slider3"][0])
+                #print([slider1, slider2, slider3])
                 space_coordinates = np.array(
                     [message["slider1"][0], message["slider2"][0], message["slider3"][0]])
 
-                # generate breathing signal
-                wav = gs.generate_from_coordinates(space_coordinates)
+                # Sample breathing signal
+                wav = gs.sample_from_coordinates(space_coordinates)
 
-                # Filter waveform
-                if filter_toggle:
-                    wav = butter_lowpass_filter(wav, filter_cutoff, fs, order)
+                # Send wav to oscPlayer
+                oscp.wav = wav
+                #oscp.wav = np.cos(3 * 2 * np.pi * np.arange(0, 16380) / 16380.)
+                if oscp.list_index == []:
+                    oscp.resample_wav()
+                    oscp.crop_wav()
+                oscp.set_waiting(True)
 
-                # Convert waveform into list and Scale for Marcelle
+                # Convert waveform into list and scale for Marcelle
+                #waveform = oscp.wav.tolist()
                 waveform = wav.tolist()
+                waveform.append(-1.)
+                waveform.append(1.)
+                waveform.insert(0, -1.)
+                waveform.insert(0, 1.)
 
                 # Send to Marcelle
                 await websocket.send(json.dumps(
                     {'waveform': waveform}))
 
+            elif message["action"] == "get_coordinates":
+                #print({'slider1': slider1, 'slider2': slider2, 'slider3': slider3})
+                await websocket.send(json.dumps(
+                    {'slider1': slider1, 'slider2': slider2, 'slider3': slider3}))
+
             elif message["action"] == "filter_toggle":
                 filter_toggle = message["value"]
+                gs.set_filter(filter_toggle, filter_cutoff)
 
             elif message["action"] == "filter_cutoff":
                 filter_cutoff = float(message["value"][0])
-                b, a = butter_lowpass(filter_cutoff, fs, order)
+                gs.set_filter(filter_toggle, filter_cutoff)
+
+            elif message["action"] == "osc_create":
+                # TODO: Build OSC message client side
+                oscp.createClient(float(message["value"][0]), float(message["value"][1]))
+
+            elif message["action"] == "osc_start":
+                if message["value"] == 1:
+                    oscp.setStream(True)
+                elif message["value"] == 0:
+                    oscp.setStream(False)
+
+            elif message["action"] == "space_factor":
+                space_factor = float(message["value"])
+                print("space_factor reçu", space_factor)
+                gs.set_space_factor(space_factor)
 
             # if message["action"] == "stream":
             #     # if message["status"][0]:
@@ -149,6 +174,9 @@ if __name__ == "__main__":
     gs = GANspire(wavegan_path, index_training)
     gs.load_model(model_name='model.ckpt-' + str(list_model_ckpts[index_training - 1]))
     print("...Model Ready!")
+
+    # Create oscPlayer
+    oscp = OscPlayer()
 
     # Start websocket server
     start_server = websockets.serve(main, "localhost", 8766)

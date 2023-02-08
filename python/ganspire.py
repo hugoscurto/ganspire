@@ -1,6 +1,11 @@
+from distutils.command.build_scripts import first_line_re
+import time
 import json
 import numpy as np
 import tensorflow as tf
+import threading
+from pythonosc import udp_client
+from scipy.signal import butter, lfilter, resample
 from sklearn.decomposition import PCA
 
 
@@ -91,6 +96,9 @@ class GANspire:
 
     def __init__(self, wavegan_path, index_training):
         print('Initiating GANspire')
+        self.wav = None
+        self.filter_toggle = False
+        self.filter_cutoff = 20.
         self.U = load_pca()
         self.space_coordinates = [0.0, 0.0, 0.0]
         self.space_factor = 50.0
@@ -103,6 +111,18 @@ class GANspire:
             if self.index_training == 3:
                 self.wavegan_latent_dim = 10
 
+    def butter_lowpass(self, cutoff, fs, order=5):
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+        b, a = butter(order, normal_cutoff, btype='low', analog=False)
+        return b, a
+
+
+    def butter_lowpass_filter(self, cutoff, fs, order=5):
+        b, a = self.butter_lowpass(cutoff, fs, order=order)
+        y = lfilter(b, a, self.wav)
+        return y
+
     def load_model(self, model_name):
         # Load the graph
         tf.reset_default_graph()
@@ -113,12 +133,26 @@ class GANspire:
         saver.restore(self.sess, self.wavegan_path + '/train_' +
                     str(self.index_training) + '/' + model_name)
         return self.sess, self.graph
+
+    def set_filter(self, filter_toggle, filter_cutoff):
+        self.filter_toggle = filter_toggle
+        self.filter_cutoff = filter_cutoff
+
+    def set_space_factor(self, space_factor):
+        self.space_factor = space_factor
     
-    def generate_from_coordinates(self, coordinates):
+    def sample_from_coordinates(self, coordinates):
         # Edit new image z by varying PCA coordinates x: z' = z + Ux
         z_prime = compute_z_prime(self.U, coordinates, self.space_factor, self.wavegan_latent_dim)
         _G_z = compute_space_samples(self.sess, z_prime, self.graph)
         self.wav = _G_z[0, :, 0]
+
+        # Filter waveform
+        if self.filter_toggle:
+            self.wav = self.butter_lowpass_filter(self.filter_toggle, self.filter_cutoff)
+
+        #print(list(self.wav))
+
         return self.wav
 
     def stream(self):
@@ -127,3 +161,101 @@ class GANspire:
 
     def get_U(self):
         return self.U
+
+
+class OscPlayer(threading.Thread):
+    def __init__(self):
+        super(OscPlayer, self).__init__()
+        
+        self.wav = None
+        self.wav_resampled = None
+        self.wav_cropped = None
+        self.index = 0
+        self.client = None
+        self.doRun = False
+        self.ready = False
+        self.freq = 30.
+        self.isWaiting = False
+        self.list_index = []
+
+        #hostIp = "172.30.41.140"
+        hostIp = 'localhost'
+        #hostIp = '192.168.43.139' # Ip address of other computer
+        port = 1235
+        self.client = udp_client.SimpleUDPClient(hostIp, port)
+        self.ready = True
+
+        self.start()
+
+        print(self.client)
+
+    def createClient(self, hostIp, port):
+        #hostIp = "172.30.41.140"
+        #hostIp = 'localhost'
+        hostIp = '192.168.43.139'
+        port = 1235
+        self.client = udp_client.SimpleUDPClient(hostIp, port)
+        self.ready = True
+
+    def assign_wav(self):
+        #temp_list = [x - self.list_index[0] for x in self.list_index]
+        if self.index + self.list_index[0] in self.list_index:
+            print("match")
+            self.resample_wav()
+            self.crop_wav()
+            self.set_waiting(False)
+            self.index = 0
+
+    def resample_wav(self):
+        num_samples = int(len(self.wav) * self.freq / 1000.)
+        self.wav_resampled = resample(self.wav, num_samples)
+        #print(self.wav_resampled)
+
+    def crop_wav(self):
+        # Compute sign changes
+        sign_wav_resampled = np.sign(self.wav_resampled)
+
+        # Get indexes where sign changes are up
+        diff_sign_wav_resampled = np.diff(sign_wav_resampled)
+        self.list_index = [index for index, x in enumerate(diff_sign_wav_resampled) if x == 2.]
+
+        # Remove indexes that are close
+        print(self.list_index)
+
+        # Get first and last indexes as crop bounds
+        first_index = self.list_index[0]
+        last_index = self.list_index[-1]
+
+        self.wav_cropped = self.wav_resampled[first_index:last_index]
+
+    def stop(self):
+        self.doRun = False
+        self.ready = False
+
+    def setStream(self, bool):
+        self.doRun = bool
+
+    def set_waiting(self, bool):
+        self.isWaiting = bool
+
+    def run(self):
+        while True:
+            if self.doRun:
+                # Resample waveform (for oscPlayer)
+                #print(self.index)
+                if self.isWaiting:
+                    self.assign_wav()
+
+                # Send value at current index
+                try:
+                    #self.client.send_message("/ganspire", float(self.wav_resampled[self.index]))
+                    self.client.send_message("/ganspire", float(self.wav_cropped[self.index]))
+                except ValueError as err:
+                    print('ValueError', err)
+
+                # Increment index
+                self.index = (self.index + 1) % len(self.wav_cropped)
+            
+            time.sleep(1./self.freq)
+                
+            
